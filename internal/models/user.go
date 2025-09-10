@@ -2,23 +2,24 @@ package models
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/Joshua-takyi/expense/server/internal/helpers"
 	"github.com/go-playground/validator/v10"
-	"github.com/google/uuid"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type User struct {
-	Id        uuid.UUID `db:"id" json:"id"`
-	Name      string    `db:"name" json:"name" validate:"required"`
-	Email     string    `db:"email" json:"email" validate:"required,email"`
-	Password  string    `db:"password" json:"-"`
-	CreatedAt time.Time `db:"created_at" json:"created_at"`
-	UpdatedAt time.Time `db:"updated_at" json:"updated_at"`
+	Id        primitive.ObjectID `bson:"_id" json:"id"`
+	Name      string             `bson:"name" json:"name" validate:"required"`
+	Email     string             `bson:"email" json:"email" validate:"required,email"`
+	Password  string             `bson:"password" json:"-"`
+	CreatedAt time.Time          `bson:"created_at" json:"created_at"`
+	UpdatedAt time.Time          `bson:"updated_at" json:"updated_at"`
 }
 
 var validate = validator.New()
@@ -26,13 +27,13 @@ var validate = validator.New()
 type UserService interface {
 	RegisterUser(ctx context.Context, user *User) error
 	AuthenticateUser(ctx context.Context, email, password string) (*User, error)
-	UpdateUserProfile(ctx context.Context, id uuid.UUID, updates map[string]interface{}) error
-	DeleteUserAccount(ctx context.Context, id uuid.UUID) error
-	GetUserProfile(ctx context.Context, id uuid.UUID) (*User, error)
+	UpdateUserProfile(ctx context.Context, id primitive.ObjectID, user *User) error
+	DeleteUserAccount(ctx context.Context, id primitive.ObjectID) error
+	GetUserProfile(ctx context.Context, id primitive.ObjectID) (*User, error)
 }
 
 type Repository struct {
-	DB *sql.DB
+	DB *mongo.Client
 }
 
 type Service interface {
@@ -42,16 +43,29 @@ type Service interface {
 
 func (r *Repository) checkUserExists(ctx context.Context, email string) (bool, error) {
 	var exists bool
-	query := "SELECT EXISTS(SELECT 1 FROM users WHERE email=$1)"
-	err := r.DB.QueryRowContext(ctx, query, email).Scan(&exists)
+
+	filter := bson.M{"email": email}
+
+	count, err := r.DB.Database("expensetracker").Collection("users").CountDocuments(ctx, filter)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("error checking user existence: %w", err)
 	}
+	exists = count > 0
 	return exists, nil
 }
 
 func (r *Repository) RegisterUser(ctx context.Context, user *User) error {
+	if r.DB == nil {
+		return fmt.Errorf("database connection is not initialized")
+	}
+
 	user.Password = strings.TrimSpace(user.Password)
+
+	// ok := helpers.IsStrongPassword(user.Password)
+	// if !ok {
+	// 	return fmt.Errorf("password is not strong enough")
+	// }
+
 	exists, err := r.checkUserExists(ctx, user.Email)
 	if err != nil {
 		return err
@@ -64,36 +78,40 @@ func (r *Repository) RegisterUser(ctx context.Context, user *User) error {
 		return fmt.Errorf("validation error: %w", err)
 	}
 
-	ok := helpers.IsStrongPassword(user.Password)
-	if !ok {
-		return fmt.Errorf("password is not strong enough")
-	}
-
 	hashedPassword, err := helpers.HashPassword(user.Password)
 	if err != nil {
 		return fmt.Errorf("error hashing password: %w", err)
 	}
 
 	now := time.Now()
+	user.Id = primitive.NewObjectID()
 	user.CreatedAt = now
 	user.UpdatedAt = now
-	query := "INSERT INTO users (name, email, password, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)"
-	_, err = r.DB.Exec(query, user.Name, user.Email, hashedPassword, user.CreatedAt, user.UpdatedAt)
-	return err
+	user.Password = hashedPassword
+
+	_, err = r.DB.Database("expensetracker").Collection("users").InsertOne(ctx, user)
+	if err != nil {
+		return fmt.Errorf("error inserting user: %w", err)
+	}
+
+	return nil
 }
 
 func (r *Repository) AuthenticateUser(ctx context.Context, email, password string) (*User, error) {
+	if r.DB == nil {
+		return nil, fmt.Errorf("database connection is not initialized")
+	}
+
 	password = strings.TrimSpace(password)
 
 	user := User{}
-	query := "SELECT id, name, email, password, created_at, updated_at FROM users WHERE email=$1"
-	err := r.DB.QueryRowContext(ctx, query, email).Scan(&user.Id, &user.Name, &user.Email, &user.Password, &user.CreatedAt, &user.UpdatedAt)
-
+	filter := bson.M{"email": email}
+	err := r.DB.Database("expensetracker").Collection("users").FindOne(ctx, filter).Decode(&user)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == mongo.ErrNoDocuments {
 			return nil, fmt.Errorf("user with email %s not found", email)
 		}
-		return nil, err
+		return nil, fmt.Errorf("error fetching user: %w", err)
 	}
 
 	ok := helpers.CheckPasswordHash(password, user.Password)
@@ -107,55 +125,56 @@ func (r *Repository) AuthenticateUser(ctx context.Context, email, password strin
 
 }
 
-func (r *Repository) UpdateUserProfile(ctx context.Context, id uuid.UUID, updates map[string]interface{}) error {
+func (r *Repository) UpdateUserProfile(ctx context.Context, id primitive.ObjectID, user *User) error {
 
-	if len(updates) == 0 {
-		return fmt.Errorf("no updates provided")
+	if r.DB == nil {
+		return fmt.Errorf("database connection is not initialized")
 	}
+	filter := bson.M{"_id": id}
+	update := bson.M{"$set": user}
+	update["$set"].(bson.M)["updated_at"] = time.Now()
 
-	setClauses := []string{}
-	args := []interface{}{}
-	i := 1
-	for key, value := range updates {
-		setClauses = append(setClauses, fmt.Sprintf("%s=$%d", key, i))
-		args = append(args, value)
-		i++
-	}
-	if len(setClauses) == 0 {
-		return fmt.Errorf("no valid updates provided")
-	}
-	query := fmt.Sprintf("UPDATE users SET %s WHERE id=$%d", strings.Join(setClauses, ", "), i)
-	args = append(args, id)
-	_, err := r.DB.ExecContext(ctx, query, args...)
-	return err
-}
-
-func (r *Repository) DeleteUserAccount(ctx context.Context, id uuid.UUID) error {
-	query := "DELETE FROM users WHERE id=$1"
-	result, err := r.DB.ExecContext(ctx, query, id)
+	result, err := r.DB.Database("expensetracker").Collection("users").UpdateOne(ctx, filter, update)
 	if err != nil {
-		return fmt.Errorf("error deleting user: %w", err)
+		return fmt.Errorf("error updating user profile: %w", err)
 	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("error fetching rows affected: %w", err)
-	}
-	if rowsAffected == 0 {
+	if result.MatchedCount == 0 {
 		return fmt.Errorf("no user found with id %s", id)
 	}
 	return nil
 }
 
-func (r *Repository) GetUserProfile(ctx context.Context, id uuid.UUID) (*User, error) {
-	user := &User{}
-	query := "SELECT id, name, email, created_at, updated_at FROM users WHERE id=$1"
-	err := r.DB.QueryRowContext(ctx, query, id).Scan(&user.Id, &user.Name, &user.Email, &user.CreatedAt, &user.UpdatedAt)
+func (r *Repository) DeleteUserAccount(ctx context.Context, id primitive.ObjectID) error {
+	if r.DB == nil {
+		return fmt.Errorf("database connection is not initialized")
+	}
+	filter := bson.M{"_id": id}
+	result, err := r.DB.Database("expensetracker").Collection("users").DeleteOne(ctx, filter)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		return fmt.Errorf("error deleting user: %w", err)
+	}
+	if result.DeletedCount == 0 {
+		return fmt.Errorf("no user found with id %s", id)
+	}
+	return nil
+}
+
+func (r *Repository) GetUserProfile(ctx context.Context, id primitive.ObjectID) (*User, error) {
+	if r.DB == nil {
+		return nil, fmt.Errorf("database connection is not initialized")
+	}
+
+	user := User{}
+	filter := bson.M{"_id": id}
+	err := r.DB.Database("expensetracker").Collection("users").FindOne(ctx, filter).Decode(&user)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
 			return nil, fmt.Errorf("user with id %s not found", id)
 		}
-		return nil, err
+		return nil, fmt.Errorf("error fetching user: %w", err)
 	}
-	return user, nil
+
+	// Remove password before returning user
+	user.Password = ""
+	return &user, nil
 }

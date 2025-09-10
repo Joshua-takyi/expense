@@ -17,15 +17,15 @@ func Middleware() gin.HandlerFunc {
 		}
 
 		// get token from the request header
-		tokenString := c.GetHeader("Authorization")
-		if tokenString == "" {
-			c.AbortWithStatusJSON(401, gin.H{"error": "authorization token not provided"})
+		token, err := c.Cookie("auth_token")
+		if err != nil || token == "" {
+			c.JSON(401, gin.H{"error": "authorization token not provided"})
 			c.Abort()
 			return
 		}
 
 		// validate the token
-		claims, err := helpers.ValidateToken(tokenString, secret)
+		claims, err := helpers.ValidateToken(token, secret)
 		if err != nil {
 			c.AbortWithStatusJSON(401, gin.H{"error": "invalid authorization token"})
 			c.Abort()

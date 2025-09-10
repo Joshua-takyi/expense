@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/golang-jwt/jwt"
 	"golang.org/x/crypto/bcrypt"
@@ -72,23 +73,20 @@ func ValidateCsfrToken(token, expectedToken string) bool {
 
 func IsStrongPassword(password string) bool {
 	var (
-		hasMinLen  = false
+		hasMinLen  = len(password) >= 8
 		hasUpper   = false
 		hasLower   = false
 		hasNumber  = false
 		hasSpecial = false
 	)
 
-	if len(password) >= 8 {
-		hasMinLen = true
-	}
 	for _, char := range password {
 		switch {
-		case 'A' <= char && char <= 'Z':
+		case unicode.IsUpper(char):
 			hasUpper = true
-		case 'a' <= char && char <= 'z':
+		case unicode.IsLower(char):
 			hasLower = true
-		case '0' <= char && char <= '9':
+		case unicode.IsDigit(char):
 			hasNumber = true
 		case strings.ContainsRune("!@#$%^&*()-_=+[]{}|;:',.<>?/", char):
 			hasSpecial = true

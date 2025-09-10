@@ -1,49 +1,54 @@
 package connection
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
-	"log"
 	"os"
+	"strings"
+	"time"
 
-	_ "github.com/lib/pq"
+	"github.com/joho/godotenv"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-// const (
-// 	port   = "5432"
-// 	host   = "localhost"
-// 	user   = "postgres"
-// 	dbname = "expensetracker"
-// )
+var Client *mongo.Client
 
-func InitPsql() (*sql.DB, error) {
-	var connStr string
+func InitDb() error {
+	if err := godotenv.Load(".env.local"); err != nil {
+		return fmt.Errorf("failed to load env files: %w", err)
+	}
+	uri := os.Getenv("MONGODB_URI")
+	password := os.Getenv("MONGODB_PASSWORD")
+	fullUri := strings.Replace(uri, "<password>", password, 1)
 
-	dbname := os.Getenv("DB_NAME")
-	host := os.Getenv("DB_HOST")
-	port := os.Getenv("DB_PORT")
-	user := os.Getenv("DB_USER")
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
 
-	password := os.Getenv("PASSWORD")
+	clientOptions := options.Client().ApplyURI(fullUri)
 
-	connStr = fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
-
-	db, err := sql.Open("postgres", connStr)
+	var err error
+	Client, err = mongo.Connect(clientOptions)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("failed to connect to MongoDB: %v", err)
 	}
 
-	err = db.Ping()
-	if err != nil {
-		return nil, err
+	if err := Client.Ping(ctx, nil); err != nil {
+		return fmt.Errorf("failed to ping MongoDB: %v", err)
 	}
 
-	return db, nil
+	fmt.Println("✅ MongoDB connected successfully")
+	return nil
 }
 
-func CloseDB(db *sql.DB) {
-	if err := db.Close(); err != nil {
-		log.Fatalf("failed to close the database connection: %v", err)
+func CloseDb() error {
+	if Client != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := Client.Disconnect(ctx); err != nil {
+			return fmt.Errorf("failed to disconnect MongoDB client: %v", err)
+		}
+		fmt.Println("✅ MongoDB disconnected successfully")
 	}
-
+	return nil
 }

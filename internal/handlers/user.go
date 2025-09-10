@@ -41,10 +41,9 @@ func AuthenticateUser(r models.Service) gin.HandlerFunc {
 			c.JSON(401, gin.H{"error": constants.ErrUnauthorized, "message": "invalid email or password"})
 			return
 		}
-
 		secret := os.Getenv("JWT_SECRET")
 		claims := &helpers.UseClaims{
-			UserID: user.Id.String(),
+			UserID: user.Id.Hex(),
 			Email:  user.Email,
 		}
 

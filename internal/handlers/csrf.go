@@ -1,21 +1,28 @@
 package handlers
 
 import (
+	"net/http"
+
 	"github.com/Joshua-takyi/expense/server/internal/helpers"
 	"github.com/gin-gonic/gin"
 )
 
-func CsrfHandler() gin.HandlerFunc {
+func CSRFHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		csrfToken, err := helpers.GenerateCsrfToken()
 		if err != nil {
-			c.JSON(500, gin.H{"error": "failed to generate CSRF token"})
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": "failed to generate csrf token",
+				"error":   err.Error(),
+			})
 			return
 		}
 
-		// set csrf token in cookie
-		c.SetCookie("csrf_token", csrfToken, 3600, "/", "", false, true)
+		c.SetCookie("csrf_token", csrfToken, 3600*24*7, "/", "localhost", true, false)
 
-		c.JSON(200, gin.H{"message": "CSRF token set", "csrf_token": csrfToken})
+		c.JSON(http.StatusOK, gin.H{
+			"message":    "CSRF token provided",
+			"csrf_token": csrfToken,
+		})
 	}
 }

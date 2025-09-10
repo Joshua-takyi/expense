@@ -2,51 +2,50 @@ package models
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
-	"strings"
 	"time"
 
-	"github.com/google/uuid"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 type Transaction struct {
-	Id       uuid.UUID `db:"id" json:"id"`
-	Amount   float64   `db:"amount" json:"amount"`
-	Type     string    `db:"type" json:"type"` // "income" or "expense"
-	Category string    `db:"category" json:"category"`
-	UserId   uuid.UUID `db:"user_id" json:"user_id"`
-	Created  time.Time `db:"created" json:"created"`
-	Updated  time.Time `db:"updated" json:"updated"`
+	Id       primitive.ObjectID `bson:"_id" json:"id"`
+	Amount   float64            `bson:"amount" json:"amount"`
+	Type     string             `bson:"type" json:"type"` // "income" or "expense"
+	Category string             `bson:"category" json:"category"`
+	UserId   primitive.ObjectID `bson:"user_id" json:"user_id"`
+	Created  time.Time          `bson:"created" json:"created"`
+	Updated  time.Time          `bson:"updated" json:"updated"`
 }
 
 type TransactionService interface {
-	AddTransaction(ctx context.Context, tx *Transaction, userID uuid.UUID) error
-	UpdateTransaction(ctx context.Context, id uuid.UUID, updates map[string]interface{}) error
-	RemoveTransaction(ctx context.Context, id uuid.UUID) error
-	GetTransactionDetails(ctx context.Context, id uuid.UUID) (*Transaction, error)
-	ListUserTransactions(ctx context.Context, userID uuid.UUID, limit, offset int) ([]Transaction, error)
+	AddTransaction(ctx context.Context, tx *Transaction, userID primitive.ObjectID) error
+	UpdateTransaction(ctx context.Context, id primitive.ObjectID, updates map[string]interface{}) error
+	RemoveTransaction(ctx context.Context, id primitive.ObjectID) error
+	GetTransactionDetails(ctx context.Context, id primitive.ObjectID) (*Transaction, error)
+	ListUserTransactions(ctx context.Context, userID primitive.ObjectID, limit, offset int) ([]Transaction, error)
 }
 
-func (r *Repository) AddTransaction(ctx context.Context, tx *Transaction, userID uuid.UUID) error {
-	query := "INSERT INTO transactions (id, amount, type, category, user_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7)"
-	now := time.Now()
-	tx.Created = now
-	tx.Updated = now
-	result, err := r.DB.ExecContext(ctx, query, tx.Id, tx.Amount, tx.Type, tx.Category, userID, tx.Created, tx.Updated)
-	if err != nil {
-		return err
+func (r *Repository) AddTransaction(ctx context.Context, tx *Transaction, userID primitive.ObjectID) error {
+	if r.DB == nil {
+		return fmt.Errorf("database connection is not initialized")
 	}
-	rowsAffected, err := result.RowsAffected()
+	tx.Id = primitive.NewObjectID()
+	tx.UserId = userID
+	tx.Created = time.Now()
+	tx.Updated = time.Now()
+
+	collection := r.DB.Database("expensetracker").Collection("transactions")
+	_, err := collection.InsertOne(ctx, tx)
 	if err != nil {
-		return err
-	}
-	if rowsAffected == 0 {
-		return fmt.Errorf("no rows affected, transaction not added")
+		return fmt.Errorf("failed to add transaction: %v", err)
 	}
 	return nil
 }
-func (r *Repository) UpdateTransaction(ctx context.Context, id uuid.UUID, updates map[string]interface{}) error {
+func (r *Repository) UpdateTransaction(ctx context.Context, id primitive.ObjectID, updates map[string]interface{}) error {
 	if len(updates) == 0 {
 		return fmt.Errorf("no updates provided")
 	}
@@ -62,61 +61,76 @@ func (r *Repository) UpdateTransaction(ctx context.Context, id uuid.UUID, update
 	if len(setClauses) == 0 {
 		return fmt.Errorf("no valid updates provided")
 	}
-	query := fmt.Sprintf("UPDATE transactions SET %s WHERE id=$%d", strings.Join(setClauses, ", "), i)
-	args = append(args, id)
-	_, err := r.DB.ExecContext(ctx, query, args...)
+
+	setClauses = append(setClauses, fmt.Sprintf("updated_at=$%d", i))
+	collection := r.DB.Database("expensetracker").Collection("transactions")
+	args = append(args, time.Now())
+	filter := bson.M{"_id": id}
+	update := bson.M{"$set": updates}
+	update["$set"].(bson.M)["updated_at"] = time.Now()
+	_, err := collection.UpdateOne(ctx, filter, update)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to update transaction: %v", err)
 	}
 	return nil
 }
 
-func (r *Repository) RemoveTransaction(ctx context.Context, id uuid.UUID) error {
-	query := "DELETE FROM transactions WHERE id=$1"
-	result, err := r.DB.ExecContext(ctx, query, id)
-	if err != nil {
-		return err
+func (r *Repository) RemoveTransaction(ctx context.Context, id primitive.ObjectID) error {
+	if r.DB == nil {
+		return fmt.Errorf("database connection is not initialized")
 	}
-	rowsAffected, err := result.RowsAffected()
+
+	filter := bson.M{"_id": id}
+	collection := r.DB.Database("expensetracker").Collection("transactions")
+	_, err := collection.DeleteOne(ctx, filter)
 	if err != nil {
-		return err
-	}
-	if rowsAffected == 0 {
-		return fmt.Errorf("no rows affected, transaction not found")
+		return fmt.Errorf("failed to remove transaction: %v", err)
 	}
 	return nil
 }
-func (r *Repository) GetTransactionDetails(ctx context.Context, id uuid.UUID) (*Transaction, error) {
-	query := `SELECT id, amount, type, category, user_id, created_at, updated_at FROM transactions WHERE id=$1`
-	row := r.DB.QueryRowContext(ctx, query, id)
+
+func (r *Repository) GetTransactionDetails(ctx context.Context, id primitive.ObjectID) (*Transaction, error) {
+	if r.DB == nil {
+		return nil, fmt.Errorf("database connection is not initialized")
+	}
+
+	collection := r.DB.Database("expensetracker").Collection("transactions")
 	var tx Transaction
-	err := row.Scan(&tx.Id, &tx.Amount, &tx.Type, &tx.Category, &tx.UserId, &tx.Created, &tx.Updated)
+	err := collection.FindOne(ctx, bson.M{"_id": id}).Decode(&tx)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == mongo.ErrNoDocuments {
 			return nil, fmt.Errorf("transaction not found")
 		}
 		return nil, err
 	}
 	return &tx, nil
 }
-func (r *Repository) ListUserTransactions(ctx context.Context, userID uuid.UUID, limit, offset int) ([]Transaction, error) {
-	query := `SELECT id, amount, type, category, user_id, created_at, updated_at FROM transactions WHERE user_id=$1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`
-	transactions := []Transaction{}
-	rows, err := r.DB.QueryContext(ctx, query, userID, limit, offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
 
-	for rows.Next() {
-		var tx Transaction
-		if err := rows.Scan(&tx.Id, &tx.Amount, &tx.Type, &tx.Category, &tx.UserId, &tx.Created, &tx.Updated); err != nil {
-			return nil, err
-		}
-		transactions = append(transactions, tx)
+func (r *Repository) ListUserTransactions(ctx context.Context, userID primitive.ObjectID, limit, offset int) ([]Transaction, error) {
+	if r.DB == nil {
+		return nil, fmt.Errorf("database connection is not initialized")
 	}
-	if err := rows.Err(); err != nil {
-		return nil, err
+
+	filter := bson.M{"user_id": userID}
+	options := options.Find()
+	if limit > 0 {
+		options.SetLimit(int64(limit))
 	}
+	if offset > 0 {
+		options.SetSkip(int64(offset))
+	}
+	options.SetSort(bson.D{{Key: "created", Value: -1}}) // Sort by created date descending
+	collection := r.DB.Database("expensetracker").Collection("transactions")
+	cursor, err := collection.Find(ctx, filter, options)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list transactions: %v", err)
+	}
+	defer cursor.Close(ctx)
+
+	var transactions []Transaction
+	if err := cursor.All(ctx, &transactions); err != nil {
+		return nil, fmt.Errorf("failed to decode transactions: %v", err)
+	}
+
 	return transactions, nil
 }

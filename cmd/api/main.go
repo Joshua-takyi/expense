@@ -12,16 +12,16 @@ import (
 
 func main() {
 
-	db, err := connection.InitPsql()
-	if err != nil {
-		log.Fatalf("failed to initialize database connection: %v", err)
+	if err := connection.InitDb(); err != nil {
+		log.Fatalf("failed to initialize database: %v", err)
 	}
-	defer connection.CloseDB(db)
+	defer func() {
+		if err := connection.CloseDb(); err != nil {
+			log.Fatalf("failed to close database: %v", err)
+		}
+	}()
 
-	repo := &models.Repository{DB: db}
-	if err := repo.InitTable(); err != nil {
-		log.Fatalf("failed to initialize tables: %v", err)
-	}
+	repo := &models.Repository{DB: connection.Client}
 
 	port := os.Getenv("PORT")
 	if port == "" {
