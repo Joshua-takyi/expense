@@ -18,22 +18,11 @@ const (
 )
 
 func InitPsql() (*sql.DB, error) {
-	var connStr string
-
-	if dbURL := os.Getenv("DATABASE_URL"); dbURL != "" {
-		// Production: Use DATABASE_URL from Render
-		connStr = dbURL
-	} else {
-		// Development: Load from .env.local
-		if err := godotenv.Load(".env.local"); err != nil {
-			log.Printf("Warning: could not load .env.local file: %v", err)
-			if err := godotenv.Load(); err != nil {
-				log.Printf("Warning: could not load .env file: %v", err)
-			}
-		}
-		password := os.Getenv("PASSWORD")
-		connStr = fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
+	if err := godotenv.Load(".env.local"); err != nil {
+		log.Fatalf("failed to read data from the env file: %v", err)
 	}
+	password := os.Getenv("PASSWORD")
+	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
 
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {

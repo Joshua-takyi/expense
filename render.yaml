@@ -9,13 +9,13 @@ services:
     buildCommand: go build -tags netgo -ldflags '-s -w' -o server ./cmd/api && ls -la
     startCommand: ./server
     port: 8080
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: expense-db
-          property: connectionString
+#     envVars:
+#       - key: DATABASE_URL
+#         fromDatabase:
+#           name: expense-db
+#           property: connectionString
 
-databases:
-  - name: expense-db
-    plan: free
-    type: postgres
+# databases:
+#   - name: expense-db
+#     plan: free
+#     type: postgres
