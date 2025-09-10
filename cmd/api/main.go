@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/joshua/expensetracker/internal/connection"
 	"github.com/joshua/expensetracker/internal/models"
@@ -21,9 +22,13 @@ func main() {
 		log.Fatalf("failed to initialize tables: %v", err)
 	}
 
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
 	// Set up the router with the service layer
 	r := router.Router(repo)
-	if err := r.Run(":8080"); err != nil {
+	if err := r.Run(":" + port); err != nil {
 		fmt.Printf("failed to run the server: %v", err)
 	}
 }
