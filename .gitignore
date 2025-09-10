@@ -11,6 +11,7 @@
 # Build artifacts and binaries
 /app
 main
+server
 *.exe
 *.dll
 *.so

@@ -6,8 +6,8 @@ services:
     env: go
     plan: free
     rootDir: .
-    buildCommand: go build -o server ./cmd/api # build binary from root
-    startCommand: ./server # run it
+    buildCommand: go build -v -o server ./cmd/api && ls -la server
+    startCommand: ./server
     port: 8080
     envVars:
       - key: DATABASE_URL
