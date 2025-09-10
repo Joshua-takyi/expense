@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
 
@@ -20,9 +19,6 @@ import (
 func InitPsql() (*sql.DB, error) {
 	var connStr string
 
-	if err := godotenv.Load(".env.local"); err != nil {
-		log.Fatalf("failed to read data from the env file: %v", err)
-	}
 	dbname := os.Getenv("DB_NAME")
 	host := os.Getenv("DB_HOST")
 	port := os.Getenv("DB_PORT")

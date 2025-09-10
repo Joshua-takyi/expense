@@ -11,6 +11,7 @@ import (
 )
 
 func main() {
+
 	db, err := connection.InitPsql()
 	if err != nil {
 		log.Fatalf("failed to initialize database connection: %v", err)
