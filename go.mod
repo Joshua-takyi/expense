@@ -1,4 +1,4 @@
-module github.com/joshua/expensetracker
+module github.com/Joshua-takyi/expense/server
 
 go 1.24.4
 

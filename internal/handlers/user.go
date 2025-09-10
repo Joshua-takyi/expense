@@ -3,10 +3,10 @@ package handlers
 import (
 	"os"
 
+	"github.com/Joshua-takyi/expense/server/internal/constants"
+	"github.com/Joshua-takyi/expense/server/internal/helpers"
+	"github.com/Joshua-takyi/expense/server/internal/models"
 	"github.com/gin-gonic/gin"
-	"github.com/joshua/expensetracker/internal/constants"
-	"github.com/joshua/expensetracker/internal/helpers"
-	"github.com/joshua/expensetracker/internal/models"
 )
 
 func RegisterUser(r models.Service) gin.HandlerFunc {

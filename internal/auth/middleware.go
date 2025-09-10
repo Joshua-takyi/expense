@@ -3,8 +3,8 @@ package auth
 import (
 	"os"
 
+	"github.com/Joshua-takyi/expense/server/internal/helpers"
 	"github.com/gin-gonic/gin"
-	"github.com/joshua/expensetracker/internal/helpers"
 )
 
 func Middleware() gin.HandlerFunc {

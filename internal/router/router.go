@@ -3,10 +3,10 @@ package router
 import (
 	"net/http"
 
+	"github.com/Joshua-takyi/expense/server/internal/auth"
+	"github.com/Joshua-takyi/expense/server/internal/handlers"
+	"github.com/Joshua-takyi/expense/server/internal/models"
 	"github.com/gin-gonic/gin"
-	"github.com/joshua/expensetracker/internal/auth"
-	"github.com/joshua/expensetracker/internal/handlers"
-	"github.com/joshua/expensetracker/internal/models"
 )
 
 func Router(s models.Service) *gin.Engine {

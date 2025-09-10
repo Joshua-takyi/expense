@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Joshua-takyi/expense/server/internal/helpers"
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
-	"github.com/joshua/expensetracker/internal/helpers"
 )
 
 type User struct {
