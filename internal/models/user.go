@@ -13,13 +13,12 @@ import (
 )
 
 type User struct {
-	Id           uuid.UUID     `db:"id" json:"id"`
-	Name         string        `db:"name" json:"name" validate:"required"`
-	Email        string        `db:"email" json:"email" validate:"required,email"`
-	Password     string        `db:"password" json:"-"`
-	CreatedAt    time.Time     `db:"created_at" json:"created_at"`
-	UpdatedAt    time.Time     `db:"updated_at" json:"updated_at"`
-	Transactions []Transaction `json:"transactions,omitempty"`
+	Id        uuid.UUID `db:"id" json:"id"`
+	Name      string    `db:"name" json:"name" validate:"required"`
+	Email     string    `db:"email" json:"email" validate:"required,email"`
+	Password  string    `db:"password" json:"-"`
+	CreatedAt time.Time `db:"created_at" json:"created_at"`
+	UpdatedAt time.Time `db:"updated_at" json:"updated_at"`
 }
 
 var validate = validator.New()
@@ -52,7 +51,7 @@ func (r *Repository) checkUserExists(ctx context.Context, email string) (bool, e
 }
 
 func (r *Repository) RegisterUser(ctx context.Context, user *User) error {
-	// check if user email already exists
+	user.Password = strings.TrimSpace(user.Password)
 	exists, err := r.checkUserExists(ctx, user.Email)
 	if err != nil {
 		return err
@@ -64,6 +63,7 @@ func (r *Repository) RegisterUser(ctx context.Context, user *User) error {
 	if err := validate.Struct(user); err != nil {
 		return fmt.Errorf("validation error: %w", err)
 	}
+
 	ok := helpers.IsStrongPassword(user.Password)
 	if !ok {
 		return fmt.Errorf("password is not strong enough")
@@ -83,9 +83,12 @@ func (r *Repository) RegisterUser(ctx context.Context, user *User) error {
 }
 
 func (r *Repository) AuthenticateUser(ctx context.Context, email, password string) (*User, error) {
-	user := &User{}
+	password = strings.TrimSpace(password)
+
+	user := User{}
 	query := "SELECT id, name, email, password, created_at, updated_at FROM users WHERE email=$1"
 	err := r.DB.QueryRowContext(ctx, query, email).Scan(&user.Id, &user.Name, &user.Email, &user.Password, &user.CreatedAt, &user.UpdatedAt)
+
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("user with email %s not found", email)
@@ -93,12 +96,15 @@ func (r *Repository) AuthenticateUser(ctx context.Context, email, password strin
 		return nil, err
 	}
 
-	if !helpers.CheckPasswordHash(password, user.Password) {
+	ok := helpers.CheckPasswordHash(password, user.Password)
+	if !ok {
 		return nil, fmt.Errorf("invalid password")
 	}
+
 	// Remove password before returning user
 	user.Password = ""
-	return user, nil
+	return &user, nil
+
 }
 
 func (r *Repository) UpdateUserProfile(ctx context.Context, id uuid.UUID, updates map[string]interface{}) error {
@@ -143,8 +149,8 @@ func (r *Repository) DeleteUserAccount(ctx context.Context, id uuid.UUID) error 
 
 func (r *Repository) GetUserProfile(ctx context.Context, id uuid.UUID) (*User, error) {
 	user := &User{}
-	query := "SELECT id, name, email, transactions, created_at, updated_at FROM users WHERE id=$1"
-	err := r.DB.QueryRowContext(ctx, query, id).Scan(&user.Id, &user.Name, &user.Email, &user.Transactions, &user.CreatedAt, &user.UpdatedAt)
+	query := "SELECT id, name, email, created_at, updated_at FROM users WHERE id=$1"
+	err := r.DB.QueryRowContext(ctx, query, id).Scan(&user.Id, &user.Name, &user.Email, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("user with id %s not found", id)

@@ -18,7 +18,6 @@ type Transaction struct {
 	UserId   uuid.UUID `db:"user_id" json:"user_id"`
 	Created  time.Time `db:"created" json:"created"`
 	Updated  time.Time `db:"updated" json:"updated"`
-	User     *User     `json:"user,omitempty"`
 }
 
 type TransactionService interface {
@@ -88,7 +87,7 @@ func (r *Repository) RemoveTransaction(ctx context.Context, id uuid.UUID) error 
 	return nil
 }
 func (r *Repository) GetTransactionDetails(ctx context.Context, id uuid.UUID) (*Transaction, error) {
-	query := `SELECT id, amount, type, category, user, created_at, updated_at FROM transactions WHERE id=$1`
+	query := `SELECT id, amount, type, category, user_id, created_at, updated_at FROM transactions WHERE id=$1`
 	row := r.DB.QueryRowContext(ctx, query, id)
 	var tx Transaction
 	err := row.Scan(&tx.Id, &tx.Amount, &tx.Type, &tx.Category, &tx.UserId, &tx.Created, &tx.Updated)
@@ -101,7 +100,7 @@ func (r *Repository) GetTransactionDetails(ctx context.Context, id uuid.UUID) (*
 	return &tx, nil
 }
 func (r *Repository) ListUserTransactions(ctx context.Context, userID uuid.UUID, limit, offset int) ([]Transaction, error) {
-	query := `SELECT id, amount, type, category, user, created_at, updated_at FROM transactions WHERE user_id=$1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`
+	query := `SELECT id, amount, type, category, user_id, created_at, updated_at FROM transactions WHERE user_id=$1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`
 	transactions := []Transaction{}
 	rows, err := r.DB.QueryContext(ctx, query, userID, limit, offset)
 	if err != nil {

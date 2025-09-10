@@ -37,6 +37,9 @@ func Router(s models.Service) *gin.Engine {
 			}
 			c.JSON(http.StatusOK, gin.H{"user": user})
 		})
+
+		protected.GET("/csrf-token", handlers.CsrfHandler())
+
 		// v1.GET("/profile", handlers.GetProfile(s))
 		// v1.PUT("/profile", handlers.UpdateProfile(s))
 

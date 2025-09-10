@@ -8,7 +8,7 @@ import (
 )
 
 func (r *Repository) InitTable() error {
-	sqlFiles, err := filepath.Glob("../../internal/migrations/*.sql") // Changed path to be relative to cmd/api
+	sqlFiles, err := filepath.Glob("internal/migrations/*.sql")
 	if err != nil {
 		return fmt.Errorf("failed to find sql files: %w", err)
 	}

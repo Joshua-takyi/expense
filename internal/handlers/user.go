@@ -29,14 +29,13 @@ func RegisterUser(r models.Service) gin.HandlerFunc {
 func AuthenticateUser(r models.Service) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
-		var req struct {
-			Email    string `json:"email" binding:"required,email"`
-			Password string `json:"password" binding:"required"`
-		}
+		req := &models.User{}
+
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(400, gin.H{"error": constants.ErrBadRequest, "message": "invalid request body"})
 			return
 		}
+
 		user, err := r.AuthenticateUser(ctx, req.Email, req.Password)
 		if err != nil {
 			c.JSON(401, gin.H{"error": constants.ErrUnauthorized, "message": "invalid email or password"})
@@ -67,7 +66,7 @@ func AuthenticateUser(r models.Service) gin.HandlerFunc {
 		c.SetCookie("csrf_token", csrfToken, 3600*24*7, "/", "", isProduction, true)
 		c.SetCookie("auth_token", token, 3600*24*7, "/", "", isProduction, true)
 
-		c.JSON(200, gin.H{"token": token})
+		c.JSON(200, gin.H{"token": token, "data": user})
 
 	}
 }
