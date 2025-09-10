@@ -15,8 +15,8 @@ import (
 var Client *mongo.Client
 
 func InitDb() error {
-	if err := godotenv.Load(".env.local"); err != nil {
-		return fmt.Errorf("failed to load env files: %w", err)
+	if err := godotenv.Load(); err != nil {
+		fmt.Println("No .env file found, reading configuration from environment variables")
 	}
 	uri := os.Getenv("MONGODB_URI")
 	password := os.Getenv("MONGODB_PASSWORD")
