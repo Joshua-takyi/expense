@@ -6,7 +6,7 @@ services:
     env: go
     plan: free
     rootDir: .
-    buildCommand: go build -v -o server ./cmd/api && ls -la server
+    buildCommand: go build -tags netgo -ldflags '-s -w' -o server ./cmd/api && ls -la
     startCommand: ./server
     port: 8080
     envVars:
