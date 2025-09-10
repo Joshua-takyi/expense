@@ -5,9 +5,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/joshua/expensetracker/internal/connection"
-	"github.com/joshua/expensetracker/internal/models"
-	"github.com/joshua/expensetracker/internal/router"
+	"github.com/Joshua-takyi/expense/server/internal/connection"
+	"github.com/Joshua-takyi/expense/server/internal/models"
+	"github.com/Joshua-takyi/expense/server/internal/router"
 )
 
 func main() {
