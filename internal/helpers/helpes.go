@@ -1,0 +1,99 @@
+package helpers
+
+import (
+	"crypto/rand"
+	"encoding/base64"
+	"strings"
+	"time"
+
+	"github.com/golang-jwt/jwt"
+	"golang.org/x/crypto/bcrypt"
+)
+
+type UseClaims struct {
+	UserID string `json:"user_id"`
+	Email  string `json:"email"`
+	*jwt.StandardClaims
+}
+
+func HashPassword(password string) (string, error) {
+	bcryptedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(bcryptedPassword), nil
+}
+
+func CheckPasswordHash(password, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
+}
+
+func GenerateJWT(claims *UseClaims, secretKey string) (string, error) {
+	claims.StandardClaims = &jwt.StandardClaims{
+		Issuer:    "expensetracker",
+		IssuedAt:  time.Now().Unix(),
+		ExpiresAt: time.Now().Add(24 * 7 * time.Hour).Unix(), // Token expires in 7 days
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signedToken, err := token.SignedString([]byte(secretKey))
+	if err != nil {
+		return "", err
+	}
+	return signedToken, nil
+}
+
+func ValidateToken(tokenStr, secretKey string) (*UseClaims, error) {
+	claims := &UseClaims{}
+	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
+		return []byte(secretKey), nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if !token.Valid {
+		return nil, jwt.ErrSignatureInvalid
+	}
+	return claims, nil
+}
+
+func GenerateCsrfToken() (string, error) {
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(tokenBytes), nil
+}
+
+func ValidateCsfrToken(token, expectedToken string) bool {
+	return token == expectedToken
+}
+
+func IsStrongPassword(password string) bool {
+	var (
+		hasMinLen  = false
+		hasUpper   = false
+		hasLower   = false
+		hasNumber  = false
+		hasSpecial = false
+	)
+
+	if len(password) >= 8 {
+		hasMinLen = true
+	}
+	for _, char := range password {
+		switch {
+		case 'A' <= char && char <= 'Z':
+			hasUpper = true
+		case 'a' <= char && char <= 'z':
+			hasLower = true
+		case '0' <= char && char <= '9':
+			hasNumber = true
+		case strings.ContainsRune("!@#$%^&*()-_=+[]{}|;:',.<>?/", char):
+			hasSpecial = true
+		}
+	}
+
+	return hasMinLen && hasUpper && hasLower && hasNumber && hasSpecial
+}
