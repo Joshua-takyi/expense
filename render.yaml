@@ -5,8 +5,8 @@ services:
     name: expense-api
     env: go
     plan: free
-    rootDir: cmd/api # go into cmd/api/
-    buildCommand: go build -o server . # build binary inside cmd/api/
+    rootDir: .
+    buildCommand: go build -o server ./cmd/api # build binary from root
     startCommand: ./server # run it
     port: 8080
     envVars:
