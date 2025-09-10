@@ -1,1 +1,40 @@
-# Paste the full .gitignore content here
+# Environment files (never commit secrets)
+.env
+.env.local
+.env.*       # any other env variants
+
+# Local dev tool config
+.air.toml
+.idea/
+.vscode/
+
+# Build artifacts and binaries
+/app
+main
+*.exe
+*.dll
+*.so
+*.dylib
+*.out
+*.test
+
+# Temporary files and logs
+tmp/
+tmp/*
+build-errors.log
+*.log
+
+# Go build / package files
+/bin/
+/pkg/
+vendor/
+
+# Test / coverage
+coverage.out
+testdata/
+
+# OS/editor metadata
+.DS_Store
+*.swp
+*.swo
+*~
