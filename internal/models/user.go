@@ -9,8 +9,8 @@ import (
 	"github.com/Joshua-takyi/expense/server/internal/helpers"
 	"github.com/go-playground/validator/v10"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/v2/bson"
-	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type User struct {
@@ -25,7 +25,7 @@ type User struct {
 var validate = validator.New()
 
 type UserService interface {
-	RegisterUser(ctx context.Context, user *User) error
+	RegisterUser(ctx context.Context, user *User) (*User, error)
 	AuthenticateUser(ctx context.Context, email, password string) (*User, error)
 	UpdateUserProfile(ctx context.Context, id primitive.ObjectID, user *User) error
 	DeleteUserAccount(ctx context.Context, id primitive.ObjectID) error
@@ -54,33 +54,28 @@ func (r *Repository) checkUserExists(ctx context.Context, email string) (bool, e
 	return exists, nil
 }
 
-func (r *Repository) RegisterUser(ctx context.Context, user *User) error {
+func (r *Repository) RegisterUser(ctx context.Context, user *User) (*User, error) {
 	if r.DB == nil {
-		return fmt.Errorf("database connection is not initialized")
+		return nil, fmt.Errorf("database connection is not initialized")
 	}
 
 	user.Password = strings.TrimSpace(user.Password)
 
-	// ok := helpers.IsStrongPassword(user.Password)
-	// if !ok {
-	// 	return fmt.Errorf("password is not strong enough")
-	// }
-
 	exists, err := r.checkUserExists(ctx, user.Email)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if exists {
-		return fmt.Errorf("user with email %s already exists", user.Email)
+		return nil, fmt.Errorf("user with email %s already exists", user.Email)
 	}
 
 	if err := validate.Struct(user); err != nil {
-		return fmt.Errorf("validation error: %w", err)
+		return nil, fmt.Errorf("validation error: %w", err)
 	}
 
 	hashedPassword, err := helpers.HashPassword(user.Password)
 	if err != nil {
-		return fmt.Errorf("error hashing password: %w", err)
+		return nil, fmt.Errorf("error hashing password: %w", err)
 	}
 
 	now := time.Now()
@@ -91,10 +86,10 @@ func (r *Repository) RegisterUser(ctx context.Context, user *User) error {
 
 	_, err = r.DB.Database("expensetracker").Collection("users").InsertOne(ctx, user)
 	if err != nil {
-		return fmt.Errorf("error inserting user: %w", err)
+		return nil, fmt.Errorf("error inserting user: %w", err)
 	}
 
-	return nil
+	return user, nil
 }
 
 func (r *Repository) AuthenticateUser(ctx context.Context, email, password string) (*User, error) {

@@ -7,17 +7,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/joho/godotenv"
-	"go.mongodb.org/mongo-driver/v2/mongo"
-	"go.mongodb.org/mongo-driver/v2/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var Client *mongo.Client
 
 func InitDb() error {
-	if err := godotenv.Load(); err != nil {
-		fmt.Println("No .env file found, reading configuration from environment variables")
-	}
+	// if err := godotenv.Load(".env.local"); err != nil {
+	// 	fmt.Println("No .env file found, reading configuration from environment variables")
+	// }
 	uri := os.Getenv("MONGODB_URI")
 	password := os.Getenv("MONGODB_PASSWORD")
 	fullUri := strings.Replace(uri, "<password>", password, 1)
@@ -28,7 +27,7 @@ func InitDb() error {
 	clientOptions := options.Client().ApplyURI(fullUri)
 
 	var err error
-	Client, err = mongo.Connect(clientOptions)
+	Client, err = mongo.Connect(ctx, clientOptions)
 	if err != nil {
 		return fmt.Errorf("failed to connect to MongoDB: %v", err)
 	}

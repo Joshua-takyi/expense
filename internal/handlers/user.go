@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"net/http"
 	"os"
+	"time"
 
 	"github.com/Joshua-takyi/expense/server/internal/constants"
 	"github.com/Joshua-takyi/expense/server/internal/helpers"
@@ -18,11 +20,12 @@ func RegisterUser(r models.Service) gin.HandlerFunc {
 			c.JSON(400, gin.H{"error": constants.ErrBadRequest, "message": "invalid request body"})
 			return
 		}
-		if err := r.RegisterUser(ctx, &user); err != nil {
+		userData, err := r.RegisterUser(ctx, &user)
+		if err != nil {
 			c.JSON(500, gin.H{"error": constants.ErrInternalServer, "message": err.Error()})
 			return
 		}
-		c.JSON(201, gin.H{"message": "user registered successfully"})
+		c.JSON(201, gin.H{"message": "user registered successfully", "user": userData})
 	}
 }
 
@@ -65,7 +68,32 @@ func AuthenticateUser(r models.Service) gin.HandlerFunc {
 		c.SetCookie("csrf_token", csrfToken, 3600*24*7, "/", "", isProduction, true)
 		c.SetCookie("auth_token", token, 3600*24*7, "/", "", isProduction, true)
 
-		c.JSON(200, gin.H{"token": token, "data": user})
+		c.JSON(200, gin.H{"data": user, "csrf_token": csrfToken})
 
 	}
+}
+
+func LogoutUser(c *gin.Context) {
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     "auth_token",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   os.Getenv("GIN_MODE") == "release" || os.Getenv("NODE_ENV") == "production",
+		SameSite: http.SameSiteLaxMode,
+		Expires:  time.Unix(0, 0),
+	})
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     "csrf_token",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   os.Getenv("GIN_MODE") == "release" || os.Getenv("NODE_ENV") == "production",
+		SameSite: http.SameSiteLaxMode,
+		Expires:  time.Unix(0, 0),
+	})
+
+	c.JSON(200, gin.H{"message": "logged out successfully"})
 }

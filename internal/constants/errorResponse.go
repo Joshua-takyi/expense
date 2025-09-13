@@ -16,4 +16,5 @@ const (
 	ErrServiceUnavailable   = "service unavailable"
 	ErrPasswordMismatch     = "passwords do not match"
 	ErrEmailAlreadyVerified = "email already verified"
+	ErrNoDocuments          = "no documents found"
 )

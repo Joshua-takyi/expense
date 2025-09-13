@@ -6,6 +6,7 @@ import (
 	"github.com/Joshua-takyi/expense/server/internal/auth"
 	"github.com/Joshua-takyi/expense/server/internal/handlers"
 	"github.com/Joshua-takyi/expense/server/internal/models"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,8 +14,22 @@ func Router(s models.Service) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 
-	r.GET("/ping", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"message": "pong"})
+	allowedOrigins := []string{
+		"http://localhost:3000",
+		"https://expense-1-kblg.onrender.com",
+	}
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     allowedOrigins,
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-CSRF-Token"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+	}))
+	r.GET("/", func(c *gin.Context) {
+		c.JSON(http.StatusOK, map[string]interface{}{
+			"status":  "success",
+			"message": "pong",
+		})
 	})
 
 	v1 := r.Group("/api/v1")
@@ -39,19 +54,20 @@ func Router(s models.Service) *gin.Engine {
 		})
 
 		protected.GET("/csrf-token", handlers.CSRFHandler())
+		protected.POST("/logout", handlers.LogoutUser)
+		// protected.GET("/profile", handlers.GetProfile(s))
+		// protected.PUT("/profile", handlers.UpdateProfile(s))
 
-		// v1.GET("/profile", handlers.GetProfile(s))
-		// v1.PUT("/profile", handlers.UpdateProfile(s))
+		// protected.POST("/categories", handlers.CreateCategory(s))
+		// protected.GET("/categories", handlers.GetCategories(s))
+		// protected.PUT("/categories/:id", handlers.UpdateCategory(s))
+		// protected.DELETE("/categories/:id", handlers.DeleteCategory(s))
 
-		// v1.POST("/categories", handlers.CreateCategory(s))
-		// v1.GET("/categories", handlers.GetCategories(s))
-		// v1.PUT("/categories/:id", handlers.UpdateCategory(s))
-		// v1.DELETE("/categories/:id", handlers.DeleteCategory(s))
-
-		// v1.POST("/transactions", handlers.CreateTransaction(s))
-		// v1.GET("/transactions", handlers.GetTransactions(s))
-		// v1.PUT("/transactions/:id", handlers.UpdateTransaction(s))
-		// v1.DELETE("/transactions/:id", handlers.DeleteTransaction(s))
+		protected.POST("/transactions", handlers.AddTransaction(s))
+		protected.GET("/transactions-query/", handlers.QueryTransactions(s))
+		protected.GET("/transactions", handlers.ListUserTransactions(s))
+		// protected.PUT("/transactions/:id", handlers.UpdateTransaction(s))
+		protected.DELETE("/transactions/:id", handlers.RemoveTransaction(s))
 	}
 	return r
 

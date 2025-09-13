@@ -3,6 +3,7 @@ package helpers
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -94,4 +95,12 @@ func IsStrongPassword(password string) bool {
 	}
 
 	return hasMinLen && hasUpper && hasLower && hasNumber && hasSpecial
+}
+
+func ParseInt(n string) int {
+	x, err := strconv.Atoi(n)
+	if err != nil {
+		return 0
+	}
+	return x
 }
